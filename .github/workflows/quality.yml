@@ -1,0 +1,39 @@
+name: Quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+        env:
+          API_BASE_URL: http://localhost:3001/api/v1
+          PUBLIC_APP_URL: http://localhost:3000
+          USE_MOCK_DATA: 'true'
+      - run: pnpm --filter @planda/web exec playwright install --with-deps chromium
+      - name: Public fixture smoke tests
+        run: >-
+          pnpm --filter @planda/web exec playwright test
+          tests/e2e/smoke.spec.ts
+          --grep-invert "restores the intended protected route"
+        env:
+          API_BASE_URL: http://localhost:3001/api/v1
+          PUBLIC_APP_URL: http://localhost:3000
+          USE_MOCK_DATA: 'true'

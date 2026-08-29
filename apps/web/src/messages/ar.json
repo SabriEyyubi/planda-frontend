@@ -1,0 +1,72 @@
+{
+  "Common": {
+    "brand": "PLANDA",
+    "foundation": "الأساس المعماري جاهز",
+    "primaryNavigation": "التنقل الرئيسي",
+    "signIn": "تسجيل الدخول",
+    "loading": "جارٍ التحميل"
+  },
+  "Auth": {
+    "login": "تسجيل الدخول",
+    "register": "إنشاء حساب",
+    "forgotPassword": "نسيت كلمة المرور",
+    "resetPassword": "إعادة تعيين كلمة المرور",
+    "name": "الاسم الكامل",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "passwordConfirmation": "تأكيد كلمة المرور",
+    "consent": "أوافق على الإفصاح وشروط الاستخدام",
+    "contractPending": "عقد OpenAPI للخادم قيد الانتظار؛ تم تعطيل الإرسال مؤقتًا."
+  },
+  "Profile": {
+    "title": "الملف الشخصي",
+    "protected": "هذه المنطقة تتطلب تسجيل الدخول.",
+    "settings": "إعدادات الحساب الشخصي",
+    "personalInformation": "المعلومات الشخصية",
+    "security": "الأمان",
+    "contractPending": "سيتم تفعيل الحقول وفقًا لعقد الخادم."
+  },
+  "Dashboard": {
+    "buyer": "المشتري",
+    "developer": "المطور",
+    "broker": "الوسيط",
+    "admin": "الإدارة",
+    "foundationNavigation": "تنقل البنية الأساسية"
+  },
+  "Placeholder": {
+    "description": "تم إنشاء حدود المسار والتخطيط.",
+    "projects": "المشاريع",
+    "projectDetail": "تفاصيل المشروع",
+    "map": "اكتشاف الخريطة",
+    "cities": "المدن",
+    "city": "المدينة",
+    "developers": "المطورون",
+    "developerProfile": "ملف المطور",
+    "compare": "مقارنة",
+    "saved": "المحفوظات",
+    "alerts": "التنبيهات",
+    "developer": "المطور",
+    "developerOverview": "نظرة عامة للمطور",
+    "developerProjects": "مشاريع المطور",
+    "inventory": "المخزون",
+    "leads": "العملاء المحتملون",
+    "paymentPlans": "خطط الدفع",
+    "media": "الوسائط",
+    "analytics": "التحليلات",
+    "developerSettings": "إعدادات المطور",
+    "broker": "الوسيط",
+    "brokerMaterials": "مواد الوسيط",
+    "brokerClients": "عملاء الوسيط",
+    "developerContacts": "جهات اتصال المطور",
+    "admin": "الإدارة"
+  },
+  "Errors": {
+    "forbiddenTitle": "لا يمكنك الوصول إلى هذه المنطقة",
+    "forbiddenDescription": "حسابك لا يملك الصلاحية المطلوبة.",
+    "unexpectedTitle": "حدث خطأ",
+    "unexpectedDescription": "تعذر إكمال العملية. حاول مرة أخرى.",
+    "retry": "حاول مرة أخرى",
+    "notFoundTitle": "الصفحة غير موجودة",
+    "notFoundDescription": "الصفحة المطلوبة غير موجودة."
+  }
+}

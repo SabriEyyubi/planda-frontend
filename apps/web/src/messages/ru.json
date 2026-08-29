@@ -1,0 +1,72 @@
+{
+  "Common": {
+    "brand": "PLANDA",
+    "foundation": "Архитектурная основа готова",
+    "primaryNavigation": "Основная навигация",
+    "signIn": "Войти",
+    "loading": "Загрузка"
+  },
+  "Auth": {
+    "login": "Войти",
+    "register": "Создать аккаунт",
+    "forgotPassword": "Забыли пароль",
+    "resetPassword": "Сбросить пароль",
+    "name": "Полное имя",
+    "email": "Электронная почта",
+    "password": "Пароль",
+    "passwordConfirmation": "Подтверждение пароля",
+    "consent": "Я принимаю условия использования",
+    "contractPending": "Контракт OpenAPI ещё не получен; отправка намеренно отключена."
+  },
+  "Profile": {
+    "title": "Профиль",
+    "protected": "Для доступа требуется авторизация.",
+    "settings": "Настройки личного аккаунта",
+    "personalInformation": "Личная информация",
+    "security": "Безопасность",
+    "contractPending": "Поля будут подключены после получения контракта бэкенда."
+  },
+  "Dashboard": {
+    "buyer": "Покупатель",
+    "developer": "Застройщик",
+    "broker": "Брокер",
+    "admin": "Администратор",
+    "foundationNavigation": "Навигация основы"
+  },
+  "Placeholder": {
+    "description": "Граница маршрута и макета создана.",
+    "projects": "Проекты",
+    "projectDetail": "Детали проекта",
+    "map": "Поиск на карте",
+    "cities": "Города",
+    "city": "Город",
+    "developers": "Застройщики",
+    "developerProfile": "Профиль застройщика",
+    "compare": "Сравнение",
+    "saved": "Сохранённое",
+    "alerts": "Уведомления",
+    "developer": "Застройщик",
+    "developerOverview": "Обзор застройщика",
+    "developerProjects": "Проекты застройщика",
+    "inventory": "Инвентарь",
+    "leads": "Лиды",
+    "paymentPlans": "Планы оплаты",
+    "media": "Медиа",
+    "analytics": "Аналитика",
+    "developerSettings": "Настройки застройщика",
+    "broker": "Брокер",
+    "brokerMaterials": "Материалы брокера",
+    "brokerClients": "Клиенты брокера",
+    "developerContacts": "Контакты застройщика",
+    "admin": "Администратор"
+  },
+  "Errors": {
+    "forbiddenTitle": "Нет доступа",
+    "forbiddenDescription": "У вашей учетной записи нет необходимых прав.",
+    "unexpectedTitle": "Произошла ошибка",
+    "unexpectedDescription": "Не удалось завершить операцию. Повторите попытку.",
+    "retry": "Повторить",
+    "notFoundTitle": "Страница не найдена",
+    "notFoundDescription": "Запрошенная страница не существует."
+  }
+}
