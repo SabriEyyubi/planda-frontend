@@ -10,13 +10,12 @@ import { ShareProjectButton } from './share-project-button';
 import { PaymentPlanSheet } from './payment-plan-sheet';
 import { MobileProjectCta } from './mobile-project-cta';
 import { getLocale, getTranslations } from 'next-intl/server';
+import { Freshness } from './freshness';
 import { ProjectViewTracker } from './project-view-tracker';
-
-const money = new Intl.NumberFormat('tr-TR', {
-  style: 'currency',
-  currency: 'TRY',
-  maximumFractionDigits: 0,
-});
+import {
+  formatProjectDate,
+  formatProjectPrice,
+} from '../model/project-presentation';
 
 export async function ProjectDetail({
   project,
@@ -25,23 +24,12 @@ export async function ProjectDetail({
 }) {
   const t = await getTranslations('ProjectDetail');
   const locale = await getLocale();
-  const delivery = project.deliveryDate
-    ? new Intl.DateTimeFormat('tr-TR', {
-        year: 'numeric',
-        month: 'long',
-      }).format(new Date(project.deliveryDate))
-    : t('ready');
-  const freshness = latestFreshness(
-    project.stockUpdatedAt,
-    project.priceUpdatedAt,
-    locale,
-    t('freshnessPending'),
-  );
+  const delivery = formatProjectDate(project.deliveryDate, locale);
   return (
     <main id="main-content" tabIndex={-1} className="project-detail">
       <ProjectViewTracker projectId={project.id} />
       <div className="breadcrumbs container">
-        İstanbul / {project.district.name} / {project.name}
+        {project.province.name} / {project.district.name} / {project.name}
       </div>
       <ProjectGallery
         project={project}
@@ -53,7 +41,16 @@ export async function ProjectDetail({
         <section>
           <div className="badge-row">
             <span className="badge">{t('construction')}</span>
-            <span className="badge badge--success">● {freshness}</span>
+            <Freshness
+              label="Stok güncellemesi"
+              value={project.stockUpdatedAt}
+              locale={locale}
+            />
+            <Freshness
+              label="Fiyat güncellemesi"
+              value={project.priceUpdatedAt}
+              locale={locale}
+            />
           </div>
           <h1>{project.name}</h1>
           <p className="project-location">
@@ -77,12 +74,20 @@ export async function ProjectDetail({
         </section>
         <aside className="project-action-card">
           <span>{t('startingPrice')}</span>
-          <strong>{money.format(Number(project.startingPrice))}</strong>
+          <strong>
+            {formatProjectPrice(
+              project.startingPrice,
+              project.currency,
+              locale,
+            )}
+          </strong>
           <dl>
             <div>
               <dt>{t('unitTypes')}</dt>
               <dd>
-                {project.unitTypes.map((unit) => unit.roomType).join(' – ')}
+                {[
+                  ...new Set(project.unitTypes.map((unit) => unit.roomType)),
+                ].join(' – ')}
               </dd>
             </div>
             <div>
@@ -122,7 +127,10 @@ export async function ProjectDetail({
         {project.unitTypes.length ? (
           <div className="unit-grid">
             {project.unitTypes.map((unit) => (
-              <article className="unit-card" key={unit.roomType}>
+              <article
+                className="unit-card"
+                key={`${unit.roomType}:${unit.currency}`}
+              >
                 <div>
                   <strong>{unit.roomType}</strong>
                   <span className="badge badge--success">
@@ -143,7 +151,13 @@ export async function ProjectDetail({
                   </div>
                   <div>
                     <dt>{t('start')}</dt>
-                    <dd>{money.format(Number(unit.startingPrice))}</dd>
+                    <dd>
+                      {formatProjectPrice(
+                        unit.startingPrice,
+                        unit.currency,
+                        locale,
+                      )}
+                    </dd>
                   </div>
                 </dl>
               </article>
@@ -194,6 +208,7 @@ export async function ProjectDetail({
               <PaymentPlanSheet
                 plan={plan}
                 startingPrice={project.startingPrice}
+                currency={project.currency}
               />
             </article>
           ))}
@@ -287,21 +302,4 @@ export function ProjectGallery({
       ))}
     </section>
   );
-}
-
-function latestFreshness(
-  stock: string | null,
-  price: string | null,
-  locale: string,
-  pending: string,
-) {
-  const latest = [stock, price]
-    .filter((value): value is string => Boolean(value))
-    .sort()
-    .at(-1);
-  if (!latest) return pending;
-  return new Intl.DateTimeFormat(locale, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(latest));
 }

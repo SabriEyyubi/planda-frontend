@@ -4,6 +4,8 @@ export type ApiErrorCode =
   | 'FORBIDDEN'
   | 'NOT_FOUND'
   | 'CONFLICT'
+  | 'LEAD_CONSENT_VERSION_MISMATCH'
+  | 'IDEMPOTENCY_KEY_REUSED'
   | 'RATE_LIMITED'
   | 'AUTH_REFRESH_COORDINATION_UNAVAILABLE'
   | 'SERVER_ERROR'
@@ -20,7 +22,17 @@ export class ApiError extends Error {
   }
 }
 
-export function normalizeApiError(status?: number, requestId?: string) {
+export function normalizeApiError(
+  status?: number,
+  requestId?: string,
+  backendCode?: unknown,
+) {
+  if (
+    status === 409 &&
+    (backendCode === 'LEAD_CONSENT_VERSION_MISMATCH' ||
+      backendCode === 'IDEMPOTENCY_KEY_REUSED')
+  )
+    return new ApiError(backendCode, status, requestId);
   const byStatus: Partial<Record<number, ApiErrorCode>> = {
     400: 'VALIDATION_ERROR',
     401: 'UNAUTHENTICATED',

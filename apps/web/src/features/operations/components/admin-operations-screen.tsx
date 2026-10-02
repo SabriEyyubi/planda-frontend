@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type {
   AdminOverview as Overview,
@@ -11,6 +11,7 @@ import type {
 import { useTranslations } from 'next-intl';
 import {
   operationsRequest,
+  type OperationPage,
   type OperationError,
 } from '../api/operations-client';
 
@@ -25,8 +26,24 @@ export function AdminOperationsScreen() {
   >();
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [feedback, setFeedback] = useState('');
+  const requestVersion = useRef(0);
+  const [cursor, setCursor] = useState('');
+  const [history, setHistory] = useState<string[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  function changeTab(next: Tab) {
+    if (next === tab && !cursor) return;
+    requestVersion.current += 1;
+    setState('loading');
+    setData(undefined);
+    setFeedback('');
+    setCursor('');
+    setHistory([]);
+    setNextCursor(null);
+    setTab(next);
+  }
 
   const load = useCallback(async () => {
+    const version = ++requestVersion.current;
     setState('loading');
     try {
       const path =
@@ -39,8 +56,13 @@ export function AdminOperationsScreen() {
         | Overview
         | ReviewProject[]
         | QualityItem[]
-        | { items: ReviewProject[] | QualityItem[] }
-      >(path);
+        | OperationPage<ReviewProject | QualityItem>
+      >(`${path}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`);
+      if (version !== requestVersion.current) return;
+      const page = response as OperationPage<ReviewProject | QualityItem>;
+      setNextCursor(
+        page.pageInfo?.hasNextPage ? page.pageInfo.nextCursor : null,
+      );
       setData(
         'items' in Object(response)
           ? (response as { items: ReviewProject[] | QualityItem[] }).items
@@ -48,19 +70,24 @@ export function AdminOperationsScreen() {
       );
       setState('ready');
     } catch (error) {
+      if (version !== requestVersion.current) return;
       setFeedback(adminError(error as OperationError));
       setState('error');
     }
-  }, [tab]);
+  }, [cursor, tab]);
   useEffect(() => {
     const frame = requestAnimationFrame(() => void load());
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      requestVersion.current += 1;
+    };
   }, [load]);
 
   async function update(
     project: ReviewProject,
     status: 'PUBLISHED' | 'ARCHIVED',
   ) {
+    const version = requestVersion.current;
     setFeedback('İşlem kaydediliyor…');
     try {
       const result = await operationsRequest<StatusResult>(
@@ -70,11 +97,13 @@ export function AdminOperationsScreen() {
           body: JSON.stringify({ status }),
         },
       );
+      if (version !== requestVersion.current) return;
       setFeedback(
         `Durum güncellendi${result.auditId ? ` · Audit ID: ${result.auditId}` : ''}.`,
       );
       await load();
     } catch (error) {
+      if (version !== requestVersion.current) return;
       setFeedback(adminError(error as OperationError));
     }
   }
@@ -94,7 +123,7 @@ export function AdminOperationsScreen() {
     if (nextIndex < 0) return;
     event.preventDefault();
     const nextTab = adminTabValues[nextIndex]!;
-    setTab(nextTab);
+    changeTab(nextTab);
     requestAnimationFrame(() =>
       document.getElementById(`admin-tab-${nextTab}`)?.focus(),
     );
@@ -130,7 +159,7 @@ export function AdminOperationsScreen() {
             tabIndex={tab === value ? 0 : -1}
             type="button"
             key={value}
-            onClick={() => setTab(value)}
+            onClick={() => changeTab(value)}
             onKeyDown={handleTabKeyDown}
           >
             {value === 'overview'
@@ -176,6 +205,32 @@ export function AdminOperationsScreen() {
           <QualityPanel items={(data as QualityItem[]) ?? []} update={update} />
         )}
       </div>
+      {state === 'ready' && (history.length > 0 || nextCursor) && (
+        <nav aria-label="Liste sayfaları" className="inline-actions">
+          <button
+            disabled={!history.length}
+            onClick={() => {
+              requestVersion.current += 1;
+              setState('loading');
+              setCursor(history.at(-1) ?? '');
+              setHistory(history.slice(0, -1));
+            }}
+          >
+            Önceki sayfa
+          </button>
+          <button
+            disabled={!nextCursor}
+            onClick={() => {
+              requestVersion.current += 1;
+              setState('loading');
+              setHistory([...history, cursor]);
+              setCursor(nextCursor ?? '');
+            }}
+          >
+            Sonraki sayfa
+          </button>
+        </nav>
+      )}
       <div className="privacy-callout">{t('policyPending')}</div>
     </section>
   );

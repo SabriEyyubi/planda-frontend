@@ -1,4 +1,13 @@
 {
+  "OpenCatalog": {
+    "city": "المدينة",
+    "cityTitle": "مشاريع {city}",
+    "price": "السعر",
+    "developer": "المطور",
+    "delivery": "موعد التسليم",
+    "unspecified": "غير محدد",
+    "viewProject": "استكشف المشروع"
+  },
   "Common": {
     "brand": "PLANDA",
     "foundation": "الأساس المعماري جاهز",
@@ -68,5 +77,13 @@
     "retry": "حاول مرة أخرى",
     "notFoundTitle": "الصفحة غير موجودة",
     "notFoundDescription": "الصفحة المطلوبة غير موجودة."
+  },
+  "BuyerCore": {
+    "selectedPlan": "خطة الدفع المختارة",
+    "buyerQuestion": "سؤالك لمكتب المبيعات (اختياري)",
+    "submissionUncertain": "تعذر تأكيد الإرسال. ستتحقق إعادة المحاولة من الطلب نفسه؛ الحقول مقفلة حتى معرفة النتيجة.",
+    "retrySubmission": "إعادة محاولة الطلب نفسه",
+    "consentChanged": "تم تحديث نص الموافقة. حدّث الصفحة وراجع النص الحالي.",
+    "requestChanged": "يختلف هذا الطلب عن الإرسال السابق. راجع طلباتي قبل إرسال طلب جديد."
   }
 }

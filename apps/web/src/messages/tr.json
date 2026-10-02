@@ -1,4 +1,13 @@
 {
+  "OpenCatalog": {
+    "city": "Şehir",
+    "cityTitle": "{city} projeleri",
+    "price": "Fiyat",
+    "developer": "Geliştirici",
+    "delivery": "Teslim tarihi",
+    "unspecified": "Belirtilmedi",
+    "viewProject": "Projeyi incele"
+  },
   "Common": {
     "brand": "PLANDA",
     "foundation": "Mimari temel hazır",
@@ -296,7 +305,13 @@
     "leadFailed": "Talep gönderilemedi. Tekrar deneyebilirsiniz.",
     "leadUnavailable": "Talep şu anda gönderilemedi. Bilgilerinizi kontrol edip tekrar deneyin.",
     "signIn": "Giriş yap",
-    "policyMissing": "Aydınlatma metni ve onay sürümü yapılandırılmadan talep gönderilemez."
+    "policyMissing": "Aydınlatma metni ve onay sürümü yapılandırılmadan talep gönderilemez.",
+    "selectedPlan": "Seçilen ödeme planı",
+    "buyerQuestion": "Satış ofisine sorunuz (isteğe bağlı)",
+    "submissionUncertain": "Gönderim sonucu henüz doğrulanamadı. Tekrar denediğinizde aynı talep kontrol edilecek; bu sırada alanlar kilitlidir.",
+    "retrySubmission": "Aynı talebi tekrar dene",
+    "consentChanged": "Onay metni güncellendi. Sayfayı yenileyip güncel metni inceleyin.",
+    "requestChanged": "Talebin içeriği önceki gönderimden farklı. Taleplerim sayfasını kontrol edip yeni bir talep gönderebilirsiniz."
   },
   "ProjectDetail": {
     "gallery": "Proje görselleri",

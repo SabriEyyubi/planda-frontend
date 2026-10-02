@@ -23,7 +23,7 @@ describe('project query contract', () => {
   it('serializes values without string interpolation', () => {
     expect(
       serializeProjectSearchParams({ q: 'Vadi & Loft', maxPrice: '10000000' }),
-    ).toBe('q=Vadi+%26+Loft&maxPrice=10000000');
+    ).toBe('q=Vadi+%26+Loft&currency=TRY&maxPrice=10000000');
   });
 
   it.each([
@@ -35,13 +35,30 @@ describe('project query contract', () => {
   ])('normalizes the legacy %s sort deep link to %s', (legacy, canonical) => {
     expect(normalizeProjectSearchParams({ sort: legacy })).toEqual({
       sort: canonical,
+      ...(canonical.startsWith('PRICE_') ? { currency: 'TRY' } : {}),
     });
   });
 
   it('sends only the backend ProjectSort enum and drops unknown sort values', () => {
     expect(serializeProjectSearchParams({ sort: 'price_asc' })).toBe(
-      'sort=PRICE_ASC',
+      'currency=TRY&sort=PRICE_ASC',
     );
     expect(normalizeProjectSearchParams({ sort: 'popular' })).toEqual({});
+  });
+
+  it('preserves explicit USD for budgets and price sorting', () => {
+    expect(
+      normalizeProjectSearchParams({
+        currency: 'USD',
+        maxPrice: '300000',
+        sort: 'PRICE_ASC',
+      }),
+    ).toEqual({ currency: 'USD', maxPrice: '300000', sort: 'PRICE_ASC' });
+  });
+
+  it('preserves ready-to-move filtering without forcing a currency', () => {
+    expect(serializeProjectSearchParams({ deliveryReady: 'true' })).toBe(
+      'deliveryReady=true',
+    );
   });
 });

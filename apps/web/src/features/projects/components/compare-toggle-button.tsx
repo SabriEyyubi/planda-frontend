@@ -17,19 +17,44 @@ export function CompareToggleButton({ projectId }: { projectId: string }) {
   const selected = ids.includes(projectId);
 
   useEffect(() => {
-    const frame = requestAnimationFrame(() =>
-      setIds(readCompareIds(localStorage.getItem(COMPARE_STORAGE_KEY))),
-    );
-    return () => cancelAnimationFrame(frame);
+    const sync = () => {
+      try {
+        setIds(readCompareIds(localStorage.getItem(COMPARE_STORAGE_KEY)));
+      } catch {
+        /* Storage may be unavailable. */
+      }
+    };
+    const changed = (event: Event) => {
+      const detail: unknown = (event as CustomEvent).detail;
+      if (Array.isArray(detail)) setIds(readCompareIds(JSON.stringify(detail)));
+    };
+    const frame = requestAnimationFrame(sync);
+    window.addEventListener('storage', sync);
+    window.addEventListener('planda:compare-change', changed);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('planda:compare-change', changed);
+    };
   }, []);
 
   function toggle() {
-    const next = toggleCompareId(ids, projectId);
-    if (!selected && next.length === ids.length) {
+    let current = ids;
+    try {
+      current = readCompareIds(localStorage.getItem(COMPARE_STORAGE_KEY));
+    } catch {
+      /* Use current in-memory selection. */
+    }
+    const next = toggleCompareId(current, projectId);
+    if (!current.includes(projectId) && next.length === current.length) {
       window.location.assign(`/${locale}/compare?limit=1`);
       return;
     }
-    localStorage.setItem(COMPARE_STORAGE_KEY, JSON.stringify(next));
+    try {
+      localStorage.setItem(COMPARE_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      /* Keep same-page selection functional. */
+    }
     setIds(next);
     window.dispatchEvent(
       new CustomEvent('planda:compare-change', { detail: next }),

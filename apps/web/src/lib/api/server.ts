@@ -31,9 +31,19 @@ export async function serverApiRequest(
     );
 
     if (!response.ok) {
+      // Only these conflict codes are safe UI recovery signals; no backend message is exposed.
+      const body: unknown =
+        response.status === 409
+          ? await response.json().catch(() => null)
+          : null;
+      const backendCode =
+        body && typeof body === 'object' && 'code' in body
+          ? body.code
+          : undefined;
       throw normalizeApiError(
         response.status,
         response.headers.get('x-request-id') ?? undefined,
+        backendCode,
       );
     }
     return response;

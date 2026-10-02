@@ -1,7 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { ProjectSummary } from '../model/project';
+import type { ProjectSummary, ProjectDetail } from '../model/project';
+import { useLocale } from 'next-intl';
+import {
+  formatProjectDate,
+  formatProjectPrice,
+} from '../model/project-presentation';
 import {
   COMPARE_STORAGE_KEY,
   MAX_COMPARE_PROJECTS,
@@ -9,23 +14,33 @@ import {
   readCompareIds,
 } from '../model/compare-storage';
 
-const money = new Intl.NumberFormat('tr-TR', {
-  style: 'currency',
-  currency: 'TRY',
-  maximumFractionDigits: 0,
-});
+import { LeadDialog } from '@/features/leads/components/lead-dialog';
+import { paymentEstimate } from '../model/payment-estimate';
+import { Freshness } from './freshness';
 
 type CompareColumn = { id: string; project?: ProjectSummary };
 
 export function CompareBoard({ projects }: { projects: ProjectSummary[] }) {
+  const locale = useLocale();
+  const [details, setDetails] = useState<Record<string, ProjectDetail | null>>(
+    {},
+  );
+  const [failed, setFailed] = useState<string[]>([]);
+  const [attempt, setAttempt] = useState(0);
+  const [selection, setSelection] = useState<
+    Record<string, { unit?: string; plan?: string }>
+  >({});
   const [ids, setIds] = useState<string[]>([]);
   const columns = useMemo(
     () =>
       ids.map((id) => ({
         id,
-        project: projects.find((item) => item.id === id),
+        project:
+          details[id] === null
+            ? undefined
+            : (details[id] ?? projects.find((item) => item.id === id)),
       })),
-    [ids, projects],
+    [ids, projects, details],
   );
   const candidates = projects.filter((project) => !ids.includes(project.id));
 
@@ -34,16 +49,76 @@ export function CompareBoard({ projects }: { projects: ProjectSummary[] }) {
       const queryIds =
         new URLSearchParams(window.location.search).get('ids')?.split(',') ??
         [];
-      const stored = readCompareIds(localStorage.getItem(COMPARE_STORAGE_KEY));
+      let stored: string[] = [];
+      try {
+        stored = readCompareIds(localStorage.getItem(COMPARE_STORAGE_KEY));
+      } catch {
+        /* Storage is optional. */
+      }
       setIds(normalizeCompareIds(queryIds.length ? queryIds : stored));
     });
     return () => cancelAnimationFrame(frame);
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    for (const id of ids) {
+      fetch(`/api/projects/${encodeURIComponent(id)}`, {
+        signal: controller.signal,
+      })
+        .then(async (response) => {
+          if (response.status === 404) return null;
+          if (!response.ok) throw new Error('Unavailable');
+          return response.json() as Promise<ProjectDetail>;
+        })
+        .then((detail) => {
+          if (!controller.signal.aborted) {
+            setDetails((current) => ({ ...current, [id]: detail }));
+            setFailed((current) => current.filter((item) => item !== id));
+          }
+        })
+        .catch(() => {
+          if (!controller.signal.aborted)
+            setFailed((current) => [...new Set([...current, id])]);
+        });
+    }
+    return () => controller.abort();
+  }, [ids, attempt]);
+
+  function chosen(id: string) {
+    const detail = details[id];
+    const unit =
+      detail?.unitTypes.find(
+        (item) => `${item.roomType}:${item.currency}` === selection[id]?.unit,
+      ) ?? detail?.unitTypes[0];
+    const plan =
+      detail?.paymentPlans.find((item) => item.id === selection[id]?.plan) ??
+      detail?.paymentPlans[0];
+    return {
+      detail,
+      unit,
+      plan,
+      estimate: paymentEstimate(unit, plan, detail?.currency ?? ''),
+    };
+  }
+  function financial(
+    id: string,
+    field: 'downPayment' | 'monthly' | 'deliveryPayment' | 'total',
+  ) {
+    const { estimate } = chosen(id);
+    return estimate
+      ? formatProjectPrice(estimate[field], estimate.currency, locale)
+      : 'Hesaplanamıyor';
+  }
+
   function persist(nextIds: string[]) {
     const next = normalizeCompareIds(nextIds);
     setIds(next);
-    localStorage.setItem(COMPARE_STORAGE_KEY, JSON.stringify(next));
+    try {
+      localStorage.setItem(COMPARE_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      /* URL remains shareable. */
+    }
     const url = new URL(window.location.href);
     if (next.length) url.searchParams.set('ids', next.join(','));
     else url.searchParams.delete('ids');
@@ -62,8 +137,8 @@ export function CompareBoard({ projects }: { projects: ProjectSummary[] }) {
               : 'Karşılaştırma listeniz boş'}
           </h1>
           <p>
-            Fiyat, konum, teslim ve geliştirici bilgilerini yan yana
-            değerlendirin.
+            Daire tipi ve ödeme planını seçin; bugün, aylık ve teslimdeki örnek
+            ödemeleri yan yana görün.
           </p>
         </div>
         <label className="compare-add">
@@ -86,6 +161,14 @@ export function CompareBoard({ projects }: { projects: ProjectSummary[] }) {
           </select>
         </label>
       </div>
+      {columns.length > 0 && (
+        <p className="privacy-callout">
+          Örnek tutarlar, seçilen daire tipinin başlangıç fiyatına yayımlanan
+          plan yüzdeleri uygulanarak hesaplanır. Teklif değildir; planın daireye
+          uygunluğu, indirimler ve ek masraflar satış ofisinden teyit
+          edilmelidir. Farklı para birimleri dönüştürülmez.
+        </p>
+      )}
       {!columns.length ? (
         <div className="empty-state">
           <h2>Karar vermek istediğiniz projeleri ekleyin</h2>
@@ -120,8 +203,16 @@ export function CompareBoard({ projects }: { projects: ProjectSummary[] }) {
                 </article>
               ) : (
                 <article className="compare-unavailable">
-                  <strong>Proje artık yayında değil</strong>
-                  <small>Mevcut bilgiler gösterilemiyor.</small>
+                  <strong>
+                    {details[id] === null
+                      ? 'Proje artık yayında değil'
+                      : 'Proje bilgileri yükleniyor'}
+                  </strong>
+                  <small>
+                    {failed.includes(id)
+                      ? 'Bağlantı kurulamadı.'
+                      : 'Güncel bilgiler kontrol ediliyor.'}
+                  </small>
                   <button
                     type="button"
                     onClick={() => persist(ids.filter((item) => item !== id))}
@@ -132,9 +223,170 @@ export function CompareBoard({ projects }: { projects: ProjectSummary[] }) {
               )
             }
           </CompareRow>
-          <CompareRow columns={columns} label="Başlangıç">
+          <CompareRow columns={columns} label="Proje başlangıcı">
             {({ project }) =>
-              project ? money.format(Number(project.startingPrice)) : '—'
+              project
+                ? formatProjectPrice(
+                    project.startingPrice,
+                    project.currency,
+                    locale,
+                  )
+                : '—'
+            }
+          </CompareRow>
+          <CompareRow columns={columns} label="Daire tipi">
+            {({ id }) => {
+              const { detail, unit } = chosen(id);
+              return detail ? (
+                <select
+                  aria-label={`${detail.name} daire tipi`}
+                  value={unit ? `${unit.roomType}:${unit.currency}` : ''}
+                  onChange={(event) =>
+                    setSelection({
+                      ...selection,
+                      [id]: { ...selection[id], unit: event.target.value },
+                    })
+                  }
+                >
+                  {!detail.unitTypes.length && (
+                    <option>Stok paylaşılmadı</option>
+                  )}
+                  {detail.unitTypes.map((item) => (
+                    <option
+                      key={`${item.roomType}:${item.currency}`}
+                      value={`${item.roomType}:${item.currency}`}
+                    >
+                      {item.roomType} · {item.currency} · {item.availableCount}{' '}
+                      müsait
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                '—'
+              );
+            }}
+          </CompareRow>
+          <CompareRow columns={columns} label="Seçilen tip başlangıcı">
+            {({ id }) => {
+              const { unit } = chosen(id);
+              return unit
+                ? formatProjectPrice(unit.startingPrice, unit.currency, locale)
+                : '—';
+            }}
+          </CompareRow>
+          <CompareRow columns={columns} label="Ödeme planı">
+            {({ id }) => {
+              const { detail, plan } = chosen(id);
+              return detail ? (
+                <select
+                  aria-label={`${detail.name} ödeme planı`}
+                  value={plan?.id ?? ''}
+                  onChange={(event) =>
+                    setSelection({
+                      ...selection,
+                      [id]: { ...selection[id], plan: event.target.value },
+                    })
+                  }
+                >
+                  {!detail.paymentPlans.length && (
+                    <option>Plan paylaşılmadı</option>
+                  )}
+                  {detail.paymentPlans.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                '—'
+              );
+            }}
+          </CompareRow>
+          <CompareRow columns={columns} label="Bugün · örnek">
+            {({ id }) => financial(id, 'downPayment')}
+          </CompareRow>
+          <CompareRow columns={columns} label="Aylık · örnek">
+            {({ id }) => financial(id, 'monthly')}
+          </CompareRow>
+          <CompareRow columns={columns} label="Teslimde · örnek">
+            {({ id }) => financial(id, 'deliveryPayment')}
+          </CompareRow>
+          <CompareRow columns={columns} label="Toplam · örnek">
+            {({ id }) => financial(id, 'total')}
+          </CompareRow>
+          <CompareRow columns={columns} label="Vade">
+            {({ id }) => {
+              const { plan } = chosen(id);
+              return plan ? `${plan.termMonths} ay` : '—';
+            }}
+          </CompareRow>
+          <CompareRow columns={columns} label="Yayımlanan plan tutarı">
+            {({ id }) => {
+              const { detail, plan } = chosen(id);
+              return detail && plan ? (
+                <>
+                  <span>
+                    Toplam:{' '}
+                    {plan.totalPrice
+                      ? formatProjectPrice(
+                          plan.totalPrice,
+                          detail.currency,
+                          locale,
+                        )
+                      : 'Paylaşılmadı'}
+                  </span>
+                  <br />
+                  <span>
+                    Aylık:{' '}
+                    {plan.monthlyPayment
+                      ? formatProjectPrice(
+                          plan.monthlyPayment,
+                          detail.currency,
+                          locale,
+                        )
+                      : 'Paylaşılmadı'}
+                  </span>
+                  <small style={{ display: 'block' }}>
+                    Seçilen daire tipine uygulanabilirliği satış ofisinden teyit
+                    edin.
+                  </small>
+                </>
+              ) : (
+                '—'
+              );
+            }}
+          </CompareRow>
+          <CompareRow columns={columns} label="Veri güncelliği">
+            {({ id, project }) =>
+              project ? (
+                <>
+                  <Freshness
+                    label="Stok"
+                    value={project.stockUpdatedAt}
+                    locale={locale}
+                  />
+                  <br />
+                  <Freshness
+                    label="Fiyat"
+                    value={project.priceUpdatedAt}
+                    locale={locale}
+                  />
+                  {failed.includes(id) && (
+                    <button
+                      type="button"
+                      onClick={() => setAttempt(attempt + 1)}
+                    >
+                      Yeniden dene
+                    </button>
+                  )}
+                </>
+              ) : failed.includes(id) ? (
+                <button type="button" onClick={() => setAttempt(attempt + 1)}>
+                  Yeniden dene
+                </button>
+              ) : (
+                '—'
+              )
             }
           </CompareRow>
           <CompareRow columns={columns} label="Lokasyon">
@@ -142,25 +394,35 @@ export function CompareBoard({ projects }: { projects: ProjectSummary[] }) {
           </CompareRow>
           <CompareRow columns={columns} label="Teslim">
             {({ project }) =>
-              project?.deliveryDate
-                ? new Intl.DateTimeFormat('tr-TR', {
-                    month: 'short',
-                    year: 'numeric',
-                  }).format(new Date(project.deliveryDate))
-                : project
-                  ? 'Teslime hazır'
-                  : '—'
+              formatProjectDate(project?.deliveryDate ?? null, locale)
             }
           </CompareRow>
           <CompareRow columns={columns} label="Geliştirici">
             {({ project }) => project?.developerName ?? '—'}
           </CompareRow>
           <CompareRow columns={columns} label="Aksiyon">
-            {({ project }) =>
+            {({ id, project }) =>
               project ? (
-                <a className="button" href={`./projects/${project.slug}`}>
-                  Projeyi gör
-                </a>
+                <div>
+                  <a
+                    className="button button--secondary"
+                    href={`./projects/${project.slug}`}
+                  >
+                    Projeyi gör
+                  </a>
+                  {details[id] && (
+                    <LeadDialog
+                      projectId={id}
+                      projectName={project.name}
+                      context={{
+                        unitPreference: chosen(id).unit?.roomType,
+                        currency: chosen(id).unit?.currency ?? project.currency,
+                        paymentPlanId: chosen(id).plan?.id,
+                        paymentPlanName: chosen(id).plan?.name,
+                      }}
+                    />
+                  )}
+                </div>
               ) : (
                 '—'
               )

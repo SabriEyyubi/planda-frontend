@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { expect, type Page, test } from '@playwright/test';
 
 const password = 'DevelopmentOnly!123';
@@ -26,6 +27,23 @@ test('developer analytics renders live metrics and an accessible trend', async (
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
+  const recordedView = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/projects/') &&
+      response.url().endsWith('/views') &&
+      response.request().method() === 'POST',
+  );
+  await page.goto('/tr/projects/seed-park');
+  const viewResponse = await recordedView;
+  expect(viewResponse.ok()).toBe(true);
+  // Tracker uses a discarded keepalive response; CDP may not expose its body.
+  // Verify the real write separately, without intercepting the application request.
+  const recorded = await page.request.post(viewResponse.url(), {
+    headers: { Origin: new URL(page.url()).origin },
+    data: { sessionId: randomUUID() },
+  });
+  expect(recorded.ok()).toBe(true);
+  expect(await recorded.json()).toMatchObject({ recorded: true });
   await login(page, 'developer@planda.test', '/tr/developer/analytics');
   await expect(
     page.getByRole('heading', { name: 'Geliştirici analitiği' }),

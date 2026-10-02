@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   DeveloperLead as Lead,
   DeveloperOverview as Overview,
@@ -9,22 +9,19 @@ import type {
   DeveloperUnit as Unit,
 } from '@planda/api-contract';
 import {
-  listItems,
+  allOperationItems,
+  type OperationPage,
   operationsRequest,
   type OperationError,
 } from '../api/operations-client';
 import { useAuthorization } from '@/lib/permissions/authorization-context';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { formatProjectPrice } from '@/features/projects/model/project-presentation';
 
 type View = 'overview' | 'projects' | 'inventory' | 'leads' | 'payment-plans';
 
-const money = new Intl.NumberFormat('tr-TR', {
-  style: 'currency',
-  currency: 'TRY',
-  maximumFractionDigits: 0,
-});
-
 export function DeveloperOperationsScreen({ view }: { view: View }) {
+  const locale = useLocale();
   const { canManageOrganization } = useAuthorization();
   const t = useTranslations('OperationsCore');
   const [projects, setProjects] = useState<Project[]>([]);
@@ -36,6 +33,18 @@ export function DeveloperOperationsScreen({ view }: { view: View }) {
   const [feedback, setFeedback] = useState('');
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('');
+  const requestVersion = useRef(0);
+  const [cursor, setCursor] = useState('');
+  const [previousCursors, setPreviousCursors] = useState<string[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  function resetPage() {
+    requestVersion.current += 1;
+    setState('loading');
+    setCursor('');
+    setPreviousCursors([]);
+    setNextCursor(null);
+  }
+
   const selectedProject = projects.find(
     (project) => project.id === (selectedProjectId || projects[0]?.id),
   );
@@ -44,19 +53,38 @@ export function DeveloperOperationsScreen({ view }: { view: View }) {
     : false;
 
   const load = useCallback(async () => {
+    const version = ++requestVersion.current;
     setState('loading');
     setFeedback('');
     try {
       if (view === 'overview') {
-        setData(await operationsRequest<Overview>('/developer/overview'));
+        const overview = await operationsRequest<Overview>(
+          '/developer/overview',
+        );
+        if (version !== requestVersion.current) return;
+        setData(overview);
         setState('ready');
         return;
       }
-      const projectResponse = await operationsRequest<
-        Project[] | { items: Project[] }
-      >('/developer/projects');
-      const availableProjects = listItems(projectResponse);
+      const projectResponse =
+        view === 'projects'
+          ? await operationsRequest<OperationPage<Project> | Project[]>(
+              `/developer/projects${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
+            )
+          : await allOperationItems<Project>(
+              '/developer/projects',
+              operationsRequest,
+            );
+      if (version !== requestVersion.current) return;
+      const availableProjects = Array.isArray(projectResponse)
+        ? projectResponse
+        : projectResponse.items;
       setProjects(availableProjects);
+      setNextCursor(
+        !Array.isArray(projectResponse) && projectResponse.pageInfo?.hasNextPage
+          ? projectResponse.pageInfo.nextCursor
+          : null,
+      );
       if (view === 'projects') {
         setData(availableProjects);
         setState('ready');
@@ -72,27 +100,43 @@ export function DeveloperOperationsScreen({ view }: { view: View }) {
       const search = new URLSearchParams();
       if (query) search.set('q', query);
       if (status) search.set('status', status);
+      if (cursor) search.set('cursor', cursor);
       const suffix = search.size ? `?${search}` : '';
       const path =
         view === 'inventory'
           ? `/developer/projects/${projectId}/units${suffix}`
           : view === 'leads'
-            ? `/developer/leads?projectId=${projectId}${query ? `&q=${encodeURIComponent(query)}` : ''}${status ? `&status=${encodeURIComponent(status)}` : ''}`
+            ? `/developer/leads?projectId=${projectId}${search.size ? `&${search}` : ''}`
             : `/developer/projects/${projectId}/payment-plans`;
       const response = await operationsRequest<
-        Unit[] | Lead[] | Plan[] | { items: Unit[] | Lead[] | Plan[] }
+        | Unit[]
+        | Lead[]
+        | Plan[]
+        | OperationPage<Unit>
+        | OperationPage<Lead>
+        | OperationPage<Plan>
       >(path);
+      if (version !== requestVersion.current) return;
       setData(Array.isArray(response) ? response : response.items);
+      setNextCursor(
+        !Array.isArray(response) && response.pageInfo?.hasNextPage
+          ? response.pageInfo.nextCursor
+          : null,
+      );
       setState('ready');
     } catch (error) {
+      if (version !== requestVersion.current) return;
       setFeedback(errorMessage(error as OperationError));
       setState('error');
     }
-  }, [query, selectedProjectId, status, view]);
+  }, [cursor, query, selectedProjectId, status, view]);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => void load());
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      requestVersion.current += 1;
+    };
   }, [load]);
 
   async function mutate(
@@ -105,15 +149,18 @@ export function DeveloperOperationsScreen({ view }: { view: View }) {
       setFeedback(t('permissionRequired'));
       return;
     }
+    const version = requestVersion.current;
     setFeedback(t('saving'));
     try {
       await operationsRequest(path, {
         method,
         ...(body ? { body: JSON.stringify(body) } : {}),
       });
+      if (version !== requestVersion.current) return;
       await load();
-      setFeedback(t('saved'));
+      if (version + 1 === requestVersion.current) setFeedback(t('saved'));
     } catch (error) {
+      if (version !== requestVersion.current) return;
       const operationError = error as OperationError;
       if (operationError.status === 409) await load();
       setFeedback(errorMessage(operationError));
@@ -154,7 +201,10 @@ export function DeveloperOperationsScreen({ view }: { view: View }) {
             <span>{t('project')}</span>
             <select
               value={selectedProjectId}
-              onChange={(event) => setSelectedProjectId(event.target.value)}
+              onChange={(event) => {
+                resetPage();
+                setSelectedProjectId(event.target.value);
+              }}
             >
               {projects.map((project) => (
                 <option key={project.id} value={project.id}>
@@ -169,7 +219,10 @@ export function DeveloperOperationsScreen({ view }: { view: View }) {
                 <span>{t('search')}</span>
                 <input
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event) => {
+                    resetPage();
+                    setQuery(event.target.value);
+                  }}
                   placeholder={t('searchPlaceholder')}
                 />
               </label>
@@ -177,7 +230,10 @@ export function DeveloperOperationsScreen({ view }: { view: View }) {
                 <span>{t('status')}</span>
                 <select
                   value={status}
-                  onChange={(event) => setStatus(event.target.value)}
+                  onChange={(event) => {
+                    resetPage();
+                    setStatus(event.target.value);
+                  }}
                 >
                   <option value="">{t('all')}</option>
                   {(view === 'inventory'
@@ -226,17 +282,49 @@ export function DeveloperOperationsScreen({ view }: { view: View }) {
           retry={t('retry')}
         />
       )}
-      {state === 'ready' &&
-        renderView(
-          view,
-          data,
-          selectedProjectId || projects[0]?.id || '',
-          mutate,
-          canManageOrganization,
-          selectedProject?.developerOrganizationId ?? '',
-          t('empty'),
-          t('permissionRequired'),
-        )}
+      {state === 'ready' && (
+        <OperationsView
+          view={view}
+          data={data}
+          projectId={selectedProjectId || projects[0]?.id || ''}
+          mutate={mutate}
+          canManageOrganization={canManageOrganization}
+          selectedOrganizationId={
+            selectedProject?.developerOrganizationId ?? ''
+          }
+          emptyText={t('empty')}
+          permissionText={t('permissionRequired')}
+          locale={locale}
+        />
+      )}
+      {state === 'ready' && (previousCursors.length > 0 || nextCursor) && (
+        <nav aria-label="Liste sayfaları" className="inline-actions">
+          <button
+            type="button"
+            disabled={!previousCursors.length}
+            onClick={() => {
+              requestVersion.current += 1;
+              setState('loading');
+              setCursor(previousCursors.at(-1) ?? '');
+              setPreviousCursors(previousCursors.slice(0, -1));
+            }}
+          >
+            Önceki sayfa
+          </button>
+          <button
+            type="button"
+            disabled={!nextCursor}
+            onClick={() => {
+              requestVersion.current += 1;
+              setState('loading');
+              setPreviousCursors([...previousCursors, cursor]);
+              setCursor(nextCursor ?? '');
+            }}
+          >
+            Sonraki sayfa
+          </button>
+        </nav>
+      )}
       <p className="privacy-callout">
         AI dosya aktarımı ve otomatik yayınlama MVP’de read-only durumdadır;
         hiçbir veri insan onayı olmadan yayınlanmaz.
@@ -245,21 +333,32 @@ export function DeveloperOperationsScreen({ view }: { view: View }) {
   );
 }
 
-function renderView(
-  view: View,
-  data: Overview | Project[] | Unit[] | Lead[] | Plan[] | undefined,
-  projectId: string,
+function OperationsView({
+  view,
+  data,
+  projectId,
+  mutate,
+  canManageOrganization,
+  selectedOrganizationId,
+  emptyText,
+  permissionText,
+  locale,
+}: {
+  view: View;
+  data: Overview | Project[] | Unit[] | Lead[] | Plan[] | undefined;
+  projectId: string;
   mutate: (
     path: string,
     method: 'PATCH' | 'DELETE',
     organizationId: string,
     body?: object,
-  ) => Promise<void>,
-  canManageOrganization: (organizationId?: string) => boolean,
-  selectedOrganizationId: string,
-  emptyText: string,
-  permissionText: string,
-) {
+  ) => Promise<void>;
+  canManageOrganization: (organizationId?: string) => boolean;
+  selectedOrganizationId: string;
+  emptyText: string;
+  permissionText: string;
+  locale: string;
+}) {
   if (view === 'overview') {
     const overview = data as Overview | undefined;
     const metrics = overview
@@ -303,7 +402,7 @@ function renderView(
         rows={(items as Project[]).map((project) => [
           project.name,
           project.status,
-          money.format(Number(project.startingPrice)),
+          formatProjectPrice(project.startingPrice, project.currency, locale),
           formatDate(project.updatedAt),
           project.status === 'DRAFT' ? (
             <button
@@ -319,7 +418,7 @@ function renderView(
                   `/developer/projects/${project.id}`,
                   'PATCH',
                   project.developerOrganizationId,
-                  { status: 'IN_REVIEW' },
+                  { status: 'IN_REVIEW', expectedVersion: project.version },
                 )
               }
             >
@@ -352,7 +451,7 @@ function renderView(
           unit.floor ?? '—',
           unit.roomType,
           `${unit.netArea} m²`,
-          money.format(Number(unit.price)),
+          formatProjectPrice(unit.price, unit.currency, locale),
           <select
             key={`unit-status-${unit.id}`}
             aria-label={`${unit.unitNumber} durumu`}
@@ -386,11 +485,34 @@ function renderView(
     return (
       <OperationsTable
         label="Satış talepleri"
-        columns={['Müşteri', 'Proje', 'Daire', 'Dil', 'Geliş', 'Durum']}
+        columns={[
+          'Müşteri',
+          'İletişim',
+          'Proje',
+          'Daire',
+          'Plan / soru',
+          'Dil',
+          'Geliş',
+          'Durum',
+        ]}
         rows={(items as Lead[]).map((lead) => [
           lead.fullName,
+          <span key={`contact-${lead.id}`}>
+            <a href={`tel:${lead.phone}`}>{lead.phone}</a>
+            {lead.email && (
+              <>
+                <br />
+                <a href={`mailto:${lead.email}`}>{lead.email}</a>
+              </>
+            )}
+          </span>,
           lead.projectName,
           lead.unitPreference ?? '—',
+          <span key={`context-${lead.id}`}>
+            <strong>{lead.paymentPlanName ?? 'Plan seçilmedi'}</strong>
+            <br />
+            {lead.message ?? '—'}
+          </span>,
           lead.preferredLanguage,
           formatDate(lead.createdAt),
           <select

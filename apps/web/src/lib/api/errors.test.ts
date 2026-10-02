@@ -7,3 +7,12 @@ describe('normalizeApiError', () => {
   it('does not expose backend messages', () =>
     expect(normalizeApiError(500).message).toBe('SERVER_ERROR'));
 });
+
+it('binds safe lead codes to conflict status only', () => {
+  expect(
+    normalizeApiError(500, undefined, 'LEAD_CONSENT_VERSION_MISMATCH').code,
+  ).toBe('SERVER_ERROR');
+  expect(
+    normalizeApiError(409, undefined, 'LEAD_CONSENT_VERSION_MISMATCH').code,
+  ).toBe('LEAD_CONSENT_VERSION_MISMATCH');
+});

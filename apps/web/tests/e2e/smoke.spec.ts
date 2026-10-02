@@ -90,7 +90,8 @@ test('core buyer journeys use English fallback outside Turkish', async ({
     await page.goto(`/${locale}`);
     await expect(
       page.getByRole('heading', {
-        name: 'Discover new housing projects in Türkiye',
+        name: 'Projects',
+        level: 1,
       }),
     ).toBeVisible();
     await page.goto(`/${locale}/projects`);

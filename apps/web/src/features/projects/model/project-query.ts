@@ -2,12 +2,14 @@ export type SearchParamValue = string | string[] | undefined;
 
 export const projectQueryKeys = [
   'q',
+  'currency',
   'provinceId',
   'districtId',
   'minPrice',
   'maxPrice',
   'roomType',
   'deliveryBefore',
+  'deliveryReady',
   'maxDownPaymentPercent',
   'maxMonthlyPayment',
   'status',
@@ -60,10 +62,22 @@ export function normalizeProjectSearchParams(
     }
     normalized[key] = trimmed;
   }
+  // Legacy budget links were explicitly denominated in TRY by the old UI.
+  // Never compare a numeric budget or price sort across currencies.
+  if (
+    !normalized.currency &&
+    (normalized.minPrice ||
+      normalized.maxPrice ||
+      normalized.maxMonthlyPayment ||
+      normalized.sort === 'PRICE_ASC' ||
+      normalized.sort === 'PRICE_DESC')
+  )
+    normalized.currency = 'TRY';
   return normalized;
 }
 
 export function serializeProjectSearchParams(source: ProjectSearchParams) {
+  source = normalizeProjectSearchParams(source);
   const query = new URLSearchParams();
   for (const key of projectQueryKeys) {
     const value =

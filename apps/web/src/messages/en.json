@@ -1,4 +1,13 @@
 {
+  "OpenCatalog": {
+    "city": "City",
+    "cityTitle": "{city} projects",
+    "price": "Price",
+    "developer": "Developer",
+    "delivery": "Delivery date",
+    "unspecified": "Not specified",
+    "viewProject": "Explore project"
+  },
   "Common": {
     "brand": "PLANDA",
     "foundation": "Architecture foundation is ready",
@@ -296,7 +305,13 @@
     "leadFailed": "The request could not be sent. You can try again.",
     "leadUnavailable": "The request is currently unavailable. Check your details and try again.",
     "signIn": "Sign in",
-    "policyMissing": "A legal notice and consent version must be configured before sending a request."
+    "policyMissing": "A legal notice and consent version must be configured before sending a request.",
+    "selectedPlan": "Selected payment plan",
+    "buyerQuestion": "Your question for the sales office (optional)",
+    "submissionUncertain": "Submission could not be confirmed. Retrying checks the same request; fields are locked until its result is known.",
+    "retrySubmission": "Retry the same request",
+    "consentChanged": "The consent text has changed. Refresh the page and review the current text.",
+    "requestChanged": "This request differs from the previous submission. Check My enquiries before sending a new request."
   },
   "ProjectDetail": {
     "gallery": "Project images",

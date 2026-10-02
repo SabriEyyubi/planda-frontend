@@ -1,33 +1,46 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { paymentEstimate } from '../model/payment-estimate';
 import type { PaymentPlan } from '../model/project';
-import { useTranslations } from 'next-intl';
-
-const money = new Intl.NumberFormat('tr-TR', {
-  style: 'currency',
-  currency: 'TRY',
-  maximumFractionDigits: 0,
-});
+import { useLocale, useTranslations } from 'next-intl';
 
 export function PaymentPlanSheet({
   plan,
   startingPrice,
+  currency,
 }: {
   plan: PaymentPlan;
   startingPrice: string;
+  currency: string;
 }) {
+  const locale = useLocale();
+  const money = new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 0,
+  });
   const [open, setOpen] = useState(false);
   const t = useTranslations('ProjectDetail');
   const openerRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLElement>(null);
   const price = Number(startingPrice);
-  const downPayment = price * (Number(plan.downPaymentPercent) / 100);
-  const deliveryPayment = price * (Number(plan.deliveryPercent) / 100);
-  const monthly = plan.termMonths
-    ? (price - downPayment - deliveryPayment) / plan.termMonths
-    : 0;
+  const estimate = paymentEstimate(
+    {
+      roomType: '',
+      startingPrice,
+      currency,
+      availableCount: 1,
+      minNetArea: '0',
+      maxNetArea: '0',
+    },
+    plan,
+    currency,
+  );
+  const downPayment = estimate?.downPayment ?? 0;
+  const deliveryPayment = estimate?.deliveryPayment ?? 0;
+  const monthly = estimate?.monthly ?? 0;
 
   useEffect(() => {
     if (!open) return;
@@ -104,28 +117,35 @@ export function PaymentPlanSheet({
               {money.format(price)} başlangıç fiyatı üzerinden bilgilendirme
               amaçlıdır.
             </p>
-            <dl>
-              <div>
-                <dt>{t('today')}</dt>
-                <dd>{money.format(downPayment)}</dd>
-              </div>
-              <div>
-                <dt>{t('monthly')}</dt>
-                <dd>
-                  {plan.termMonths
-                    ? `${money.format(monthly)} / ay`
-                    : t('noInstallments')}
-                </dd>
-              </div>
-              <div>
-                <dt>{t('onDelivery')}</dt>
-                <dd>{money.format(deliveryPayment)}</dd>
-              </div>
-              <div>
-                <dt>{t('total')}</dt>
-                <dd>{money.format(price)}</dd>
-              </div>
-            </dl>
+            {estimate ? (
+              <dl>
+                <div>
+                  <dt>{t('today')}</dt>
+                  <dd>{money.format(downPayment)}</dd>
+                </div>
+                <div>
+                  <dt>{t('monthly')}</dt>
+                  <dd>
+                    {plan.termMonths
+                      ? `${money.format(monthly)} / ay`
+                      : t('noInstallments')}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{t('onDelivery')}</dt>
+                  <dd>{money.format(deliveryPayment)}</dd>
+                </div>
+                <div>
+                  <dt>{t('total')}</dt>
+                  <dd>{money.format(price)}</dd>
+                </div>
+              </dl>
+            ) : (
+              <p role="status">
+                Ödeme takvimi eksik veya tutarsız. Satış ofisinden güncel planı
+                isteyin.
+              </p>
+            )}
             <p className="privacy-callout">{t('calculationDisclaimer')}</p>
           </section>
         </div>

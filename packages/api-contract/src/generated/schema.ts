@@ -877,6 +877,9 @@ export interface components {
             preferredLanguage: "TR" | "EN" | "AR" | "RU";
             /** @example 2+1 */
             unitPreference?: string;
+            /** Format: uuid */
+            paymentPlanId?: string;
+            message?: string;
             /** @example 8000000.0000 */
             budgetMin?: string;
             /** @example 12000000.0000 */
@@ -900,6 +903,10 @@ export interface components {
             /** @enum {string} */
             preferredLanguage: "TR" | "EN" | "AR" | "RU";
             unitPreference?: Record<string, never> | null;
+            /** Format: uuid */
+            paymentPlanId?: string | null;
+            paymentPlanName?: string | null;
+            message?: string | null;
             budgetMin?: Record<string, never> | null;
             budgetMax?: Record<string, never> | null;
             currency: string;
@@ -944,17 +951,17 @@ export interface components {
             /** Format: uuid */
             id: string;
             unitNumber: string;
-            block?: Record<string, never> | null;
-            floor?: Record<string, never> | null;
+            block?: string | null;
+            floor?: number | null;
             roomType: string;
             netArea: string;
-            grossArea?: Record<string, never> | null;
+            grossArea?: string | null;
             price: string;
             currency: string;
             /** @enum {string} */
             status: "AVAILABLE" | "RESERVED" | "SOLD";
-            orientation?: Record<string, never> | null;
-            floorPlanImageUrl?: Record<string, never> | null;
+            orientation?: string | null;
+            floorPlanImageUrl?: string | null;
             version: number;
             /** Format: date-time */
             updatedAt: string;
@@ -1058,6 +1065,29 @@ export interface components {
         DeletePaymentPlanDto: {
             expectedVersion: number;
         };
+        BrokerUnitResponseDto: {
+            /** Format: uuid */
+            id: string;
+            unitNumber: string;
+            block?: string | null;
+            floor?: number | null;
+            roomType: string;
+            netArea: string;
+            grossArea?: string | null;
+            price: string;
+            currency: string;
+            /** @enum {string} */
+            status: "AVAILABLE" | "RESERVED" | "SOLD";
+            orientation?: string | null;
+            floorPlanImageUrl?: string | null;
+            version: number;
+            /** Format: date-time */
+            updatedAt: string;
+            brokerPrice?: string | null;
+            commissionPercent?: string | null;
+            /** Format: date-time */
+            brokerTermsUpdatedAt?: string | null;
+        };
         BrokerProjectResponseDto: {
             /** Format: uuid */
             id: string;
@@ -1065,11 +1095,13 @@ export interface components {
             name: string;
             developerName: string;
             publicStartingPrice: string;
-            brokerPrice?: Record<string, never> | null;
-            commissionPercent?: Record<string, never> | null;
-            reservationHours?: Record<string, never> | null;
-            salesContact?: Record<string, never> | null;
-            units: Record<string, never>[];
+            /** @description Currency of publicStartingPrice and the project brokerPrice */
+            currency: string;
+            brokerPrice?: string | null;
+            commissionPercent?: string | null;
+            reservationHours?: number | null;
+            salesContact?: string | null;
+            units: components["schemas"]["BrokerUnitResponseDto"][];
             materialCount: number;
             /** Format: date-time */
             updatedAt: string;
@@ -1394,6 +1426,8 @@ export interface components {
              * @enum {string}
              */
             constructionStatus: "PLANNED" | "UNDER_CONSTRUCTION" | "READY";
+            /** @description Project version originally loaded by the editor */
+            expectedVersion: number;
             /**
              * @description Developer transition is limited to DRAFT → IN_REVIEW
              * @enum {string}
@@ -4222,6 +4256,8 @@ export interface operations {
     ProjectsController_list_v1: {
         parameters: {
             query?: {
+                /** @description Required for price bounds, monthly payment bounds, and price sorting; no conversion */
+                currency?: "TRY" | "USD";
                 /** @description Project, developer or location search */
                 q?: string;
                 provinceId?: string;

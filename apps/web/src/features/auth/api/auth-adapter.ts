@@ -67,6 +67,8 @@ export const authApiAdapter: AuthApiAdapter = {
         refreshMaxAge: tokens.refreshTokenExpiresIn,
       };
     } catch (error) {
+      // Only an authoritative invalid-session response may clear browser tokens.
+      if (error instanceof ApiError && error.status === 401) return null;
       if (error instanceof ApiError && (error.status ?? 0) >= 500) {
         throw new ApiError(
           error.status === 503
@@ -76,7 +78,7 @@ export const authApiAdapter: AuthApiAdapter = {
           error.requestId,
         );
       }
-      return null;
+      throw error;
     }
   },
   async revokeSession(refreshToken) {

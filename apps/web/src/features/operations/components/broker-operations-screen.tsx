@@ -1,39 +1,38 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   BrokerMaterial as Material,
   BrokerProject,
 } from '@planda/api-contract';
 import {
   listItems,
+  allOperationItems,
   operationsRequest,
   type OperationError,
 } from '../api/operations-client';
 import { useLocale, useTranslations } from 'next-intl';
+import { formatProjectPrice } from '@/features/projects/model/project-presentation';
 
 export function BrokerProjectScreen() {
   const t = useTranslations('Broker');
   const locale = useLocale();
-  const money = new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency: 'TRY',
-    maximumFractionDigits: 0,
-  });
   const [projects, setProjects] = useState<BrokerProject[]>([]);
   const [selected, setSelected] = useState('');
   const [project, setProject] = useState<BrokerProject>();
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const requestVersion = useRef(0);
   const [message, setMessage] = useState('');
 
   const load = useCallback(async () => {
+    const version = ++requestVersion.current;
     setState('loading');
     try {
-      const list = listItems(
-        await operationsRequest<BrokerProject[] | { items: BrokerProject[] }>(
-          '/broker/projects',
-        ),
+      const list = await allOperationItems<BrokerProject>(
+        '/broker/projects',
+        operationsRequest,
       );
+      if (version !== requestVersion.current) return;
       setProjects(list);
       const id = selected || list[0]?.id;
       if (!id) {
@@ -42,11 +41,14 @@ export function BrokerProjectScreen() {
         return;
       }
       if (!selected) setSelected(id);
-      setProject(
-        await operationsRequest<BrokerProject>(`/broker/projects/${id}`),
+      const detail = await operationsRequest<BrokerProject>(
+        `/broker/projects/${id}`,
       );
+      if (version !== requestVersion.current) return;
+      setProject(detail);
       setState('ready');
     } catch (error) {
+      if (version !== requestVersion.current) return;
       setMessage(
         t('loadFailed', {
           requestId: (error as OperationError).requestId ?? '',
@@ -58,7 +60,10 @@ export function BrokerProjectScreen() {
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => void load());
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      requestVersion.current += 1;
+    };
   }, [load]);
 
   return (
@@ -77,7 +82,11 @@ export function BrokerProjectScreen() {
           <select
             aria-label={t('selectProject')}
             value={selected}
-            onChange={(event) => setSelected(event.target.value)}
+            onChange={(event) => {
+              requestVersion.current += 1;
+              setState('loading');
+              setSelected(event.target.value);
+            }}
           >
             {projects.map((item) => (
               <option value={item.id} key={item.id}>
@@ -130,14 +139,22 @@ export function BrokerProjectScreen() {
             <article>
               <span>{t('publicPrice')}</span>
               <strong>
-                {money.format(Number(project.publicStartingPrice))}
+                {formatProjectPrice(
+                  project.publicStartingPrice,
+                  project.currency,
+                  locale,
+                )}
               </strong>
             </article>
             <article>
               <span>{t('brokerPrice')}</span>
               <strong>
                 {project.brokerPrice
-                  ? money.format(Number(project.brokerPrice))
+                  ? formatProjectPrice(
+                      project.brokerPrice,
+                      project.currency,
+                      locale,
+                    )
                   : t('notProvided')}
               </strong>
             </article>
@@ -215,7 +232,7 @@ export function BrokerProjectScreen() {
                       unit.roomType,
                       unit.floor ?? '—',
                       unit.netArea,
-                      money.format(Number(unit.price)),
+                      formatProjectPrice(unit.price, unit.currency, locale),
                       unit.status,
                       new Intl.DateTimeFormat(locale, {
                         dateStyle: 'short',
@@ -246,15 +263,17 @@ export function BrokerMaterialsScreen() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [language, setLanguage] = useState('ALL');
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const requestVersion = useRef(0);
 
   const load = useCallback(async () => {
+    const version = ++requestVersion.current;
     setState('loading');
     try {
-      const list = listItems(
-        await operationsRequest<BrokerProject[] | { items: BrokerProject[] }>(
-          '/broker/projects',
-        ),
+      const list = await allOperationItems<BrokerProject>(
+        '/broker/projects',
+        operationsRequest,
       );
+      if (version !== requestVersion.current) return;
       setProjects(list);
       const id = projectId || list[0]?.id;
       if (!id) {
@@ -266,15 +285,20 @@ export function BrokerMaterialsScreen() {
       const response = await operationsRequest<
         Material[] | { items: Material[] }
       >(`/broker/projects/${id}/materials`);
+      if (version !== requestVersion.current) return;
       setMaterials(listItems(response));
       setState('ready');
     } catch {
+      if (version !== requestVersion.current) return;
       setState('error');
     }
   }, [projectId]);
   useEffect(() => {
     const frame = requestAnimationFrame(() => void load());
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      requestVersion.current += 1;
+    };
   }, [load]);
   const visible = materials.filter(
     (material) =>
@@ -297,7 +321,11 @@ export function BrokerMaterialsScreen() {
           <select
             aria-label={t('selectMaterialProject')}
             value={projectId}
-            onChange={(event) => setProjectId(event.target.value)}
+            onChange={(event) => {
+              requestVersion.current += 1;
+              setState('loading');
+              setProjectId(event.target.value);
+            }}
           >
             {projects.map((project) => (
               <option key={project.id} value={project.id}>

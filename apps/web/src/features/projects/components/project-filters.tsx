@@ -7,9 +7,11 @@ import { useTranslations } from 'next-intl';
 export function ProjectFilters({
   values,
   compact = false,
+  cities,
 }: {
   values: ProjectSearchParams;
   compact?: boolean;
+  cities?: { id: string; name: string }[];
 }) {
   const t = useTranslations('BuyerCore');
   const [open, setOpen] = useState(false);
@@ -57,7 +59,7 @@ export function ProjectFilters({
         className={`project-filter-form project-filter-form--desktop ${compact ? 'project-filter-form--compact' : ''}`}
         method="get"
       >
-        {!compact && <FilterFields values={values} />}
+        {!compact && <FilterFields values={values} cities={cities} />}
       </form>
       <div
         className={`mobile-filter-controls ${compact ? 'mobile-filter-controls--map' : ''}`}
@@ -101,7 +103,7 @@ export function ProjectFilters({
               className="project-filter-form project-filter-form--sheet"
               method="get"
             >
-              <FilterFields values={values} />
+              <FilterFields values={values} cities={cities} />
             </form>
           </section>
         </div>
@@ -110,34 +112,103 @@ export function ProjectFilters({
   );
 }
 
-function FilterFields({ values }: { values: ProjectSearchParams }) {
+function FilterFields({
+  values,
+  cities,
+}: {
+  values: ProjectSearchParams;
+  cities?: { id: string; name: string }[];
+}) {
   const t = useTranslations('BuyerCore');
+  const catalogText = useTranslations('OpenCatalog');
+  const profile = useTranslations('Profile');
+  const [locationChanged, setLocationChanged] = useState(false);
+  const [currencyRequired, setCurrencyRequired] = useState(
+    Boolean(
+      values.minPrice ||
+      values.maxPrice ||
+      values.maxMonthlyPayment ||
+      values.sort === 'PRICE_ASC' ||
+      values.sort === 'PRICE_DESC',
+    ),
+  );
+  function updateCurrencyRequirement(
+    event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) {
+    const form = event.currentTarget.form;
+    if (!form) return;
+    const data = new FormData(form);
+    setCurrencyRequired(
+      ['minPrice', 'maxPrice', 'maxMonthlyPayment'].some(
+        (key) => String(data.get(key) ?? '').trim() !== '',
+      ) || ['PRICE_ASC', 'PRICE_DESC'].includes(String(data.get('sort'))),
+    );
+  }
   return (
     <>
+      {cities && (
+        <label>
+          <span>{catalogText('city')}</span>
+          <select
+            name="provinceId"
+            defaultValue={values.provinceId ?? ''}
+            onChange={(event) =>
+              setLocationChanged(
+                event.currentTarget.value !== (values.provinceId ?? ''),
+              )
+            }
+          >
+            <option value="">{t('all')}</option>
+            {values.provinceId &&
+              !cities.some((city) => city.id === values.provinceId) && (
+                <option value={values.provinceId}>{values.provinceId}</option>
+              )}
+            {cities.map((city) => (
+              <option key={city.id} value={city.id}>
+                {city.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className="filter-search">
         <span>{t('locationOrProject')}</span>
         <input
           name="q"
           defaultValue={values.q}
-          placeholder="İstanbul, ilçe veya proje"
+          placeholder={t('searchPlaceholder')}
         />
+      </label>
+      <label>
+        <span>{profile('currency')}</span>
+        <select
+          name="currency"
+          defaultValue={values.currency ?? ''}
+          required={currencyRequired}
+        >
+          <option value="">{t('all')}</option>
+          <option value="TRY">TRY</option>
+          <option value="USD">USD</option>
+        </select>
       </label>
       <label>
         <span>{t('minPrice')}</span>
         <input
           name="minPrice"
+          onChange={updateCurrencyRequirement}
           inputMode="decimal"
           defaultValue={values.minPrice}
-          placeholder="₺5.000.000"
+          placeholder="5000000"
         />
       </label>
       <label>
         <span>{t('maxPrice')}</span>
         <input
           name="maxPrice"
+          onChange={updateCurrencyRequirement}
           inputMode="decimal"
           defaultValue={values.maxPrice}
-          placeholder="₺10.000.000"
+          placeholder="10000000"
         />
       </label>
       <label>
@@ -171,22 +242,41 @@ function FilterFields({ values }: { values: ProjectSearchParams }) {
         <span>{t('maxMonthly')}</span>
         <input
           name="maxMonthlyPayment"
+          onChange={updateCurrencyRequirement}
           inputMode="decimal"
           defaultValue={values.maxMonthlyPayment}
-          placeholder="₺300.000"
+          placeholder="300000"
         />
       </label>
-      <label>
+      <label className={cities ? 'catalog-filter-sort' : undefined}>
         <span>{t('sort')}</span>
-        <select name="sort" defaultValue={values.sort ?? 'NEWEST'}>
+        <select
+          name="sort"
+          defaultValue={values.sort ?? 'NEWEST'}
+          onChange={updateCurrencyRequirement}
+        >
           <option value="NEWEST">{t('newest')}</option>
           <option value="PRICE_ASC">{t('priceAsc')}</option>
           <option value="PRICE_DESC">{t('priceDesc')}</option>
           <option value="DELIVERY_ASC">{t('deliveryAsc')}</option>
         </select>
       </label>
-      {values.bounds && (
-        <input type="hidden" name="bounds" value={values.bounds} />
+      {(
+        [
+          'bounds',
+          'provinceId',
+          'districtId',
+          'deliveryReady',
+          'status',
+          'minNetArea',
+          'amenities',
+        ] as const
+      ).map((key) =>
+        values[key] &&
+        !(key === 'provinceId' && cities) &&
+        !(locationChanged && (key === 'districtId' || key === 'bounds')) ? (
+          <input key={key} type="hidden" name={key} value={values[key]} />
+        ) : null,
       )}
       <div className="filter-actions">
         <a href="?">{t('clearAll')}</a>

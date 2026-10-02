@@ -34,6 +34,10 @@ export type PaymentPlan = {
   termMonths: number;
   deliveryPercent: string;
   isRecommended: boolean;
+  monthlyPayment?: string | null;
+  totalPrice?: string | null;
+  cashDiscountPercent?: string | null;
+  timelineNote?: string | null;
 };
 
 export type ProjectMedia = {
