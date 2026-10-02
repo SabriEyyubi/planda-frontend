@@ -42,9 +42,9 @@ describe('CompareBoard live selected details', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent(
       detail.paymentPlans[0]!.name,
     );
-    expect(screen.getByLabelText(messages.BuyerCore.unitPreference)).toHaveValue(
-      detail.unitTypes[0]!.roomType,
-    );
+    expect(
+      screen.getByLabelText(messages.BuyerCore.unitPreference),
+    ).toHaveValue(detail.unitTypes[0]!.roomType);
   });
   it('offers recovery for fetch failure rather than declaring the project unpublished', async () => {
     history.replaceState(null, '', '/?ids=remote-id');

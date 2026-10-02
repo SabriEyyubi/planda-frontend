@@ -49,7 +49,10 @@ describe('ProjectCard backend facts', () => {
     const projectLinks = screen.getAllByRole('link', { name: 'viewProject' });
     expect(projectLinks).toHaveLength(2);
     for (const link of projectLinks) {
-      expect(link).toHaveAttribute('href', `/projects/${projectFixtures[0]!.slug}`);
+      expect(link).toHaveAttribute(
+        'href',
+        `/projects/${projectFixtures[0]!.slug}`,
+      );
     }
   });
   it('shows actual USD price and image, without falsely claiming ready/current', async () => {

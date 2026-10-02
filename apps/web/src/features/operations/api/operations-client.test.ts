@@ -24,12 +24,10 @@ describe('authorized project pagination', () => {
     );
   });
   it('fails explicitly on a repeated cursor rather than looping or hiding records', async () => {
-    const request = vi
-      .fn()
-      .mockResolvedValue({
-        items: [],
-        pageInfo: { hasNextPage: true, nextCursor: 'same' },
-      });
+    const request = vi.fn().mockResolvedValue({
+      items: [],
+      pageInfo: { hasNextPage: true, nextCursor: 'same' },
+    });
     await expect(
       allOperationItems(
         '/broker/projects',
